@@ -4,22 +4,15 @@ import { CLASSES, type ClassRoom } from "@/data/classes";
 
 const DATA_PATH = path.join(process.cwd(), "data", "classes.json");
 
-async function fileExists(p: string): Promise<boolean> {
-  try {
-    await fs.access(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export async function getClasses(): Promise<ClassRoom[]> {
-  if (!(await fileExists(DATA_PATH))) {
-    await fs.writeFile(DATA_PATH, JSON.stringify(CLASSES, null, 2), "utf-8");
+  try {
+    const raw = await fs.readFile(DATA_PATH, "utf-8");
+    return JSON.parse(raw) as ClassRoom[];
+  } catch {
+    // 파일이 없거나 읽을 수 없으면 seed로 폴백.
+    // (Vercel 같은 read-only 파일시스템에서는 절대 쓰지 않음)
     return CLASSES;
   }
-  const raw = await fs.readFile(DATA_PATH, "utf-8");
-  return JSON.parse(raw) as ClassRoom[];
 }
 
 export async function getClass(id: string): Promise<ClassRoom | undefined> {
