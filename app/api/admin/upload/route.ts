@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
 import { randomBytes } from "crypto";
+import { put } from "@vercel/blob";
 
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 const MAX_BYTES = 20 * 1024 * 1024; // 20MB
@@ -51,11 +52,27 @@ export async function POST(req: Request) {
     );
   }
 
-  await fs.mkdir(UPLOAD_DIR, { recursive: true });
   const fromName = path.extname(file.name).toLowerCase();
   const ext = fromName || EXT_MAP[file.type] || ".bin";
   const safeBase = `${Date.now().toString(36)}-${randomBytes(4).toString("hex")}`;
   const name = `${safeBase}${ext}`;
+
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    try {
+      const blob = await put(`uploads/${name}`, file, {
+        access: "public",
+        addRandomSuffix: false,
+        contentType: file.type,
+      });
+      return NextResponse.json({ url: blob.url, type: file.type });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "업로드 실패";
+      return NextResponse.json({ error: msg }, { status: 500 });
+    }
+  }
+
+  // 로컬 fs 폴백
+  await fs.mkdir(UPLOAD_DIR, { recursive: true });
   const dest = path.join(UPLOAD_DIR, name);
   const buf = Buffer.from(await file.arrayBuffer());
   await fs.writeFile(dest, buf);
